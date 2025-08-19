@@ -25,28 +25,42 @@ class MetasploitModule < Msf::Post
   )
   end
 
-  # TODO figure out the directories for all other apps
-  # TODO different versions may have different directory names, figure this out.
+  # Holds information on an objective see product. i.e name, installation status user perms, group perms, owner, and location on filesystem.
+  class ObjectiveSee
+    def initalize(name)
+      @name = name
+      @path = "/Applications/#{name}"
+      @installed = installed?
+    end 
+
+    # define accessor methods
+   %w[name path].each do |method|
+    define_method "#{method}" do
+      eval("@#{method}", binding, __FILE__, __LINE__)
+    end 
+   end 
+
+   def installed?
+    if is_dir? @path
+      @installed = true 
+      ObjectiveSee.product_list << self
+    else 
+       @installed = false
+     end 
+     @installed
+   end 
+
+   class << self
+    def product_list
+      []
+    end 
+   end 
+  end 
+
   def enumerate
-  	# Array of directory names used by Objective See products. These will be in the /Applications/folder.
-  	# ex. drwxr-xr-x@  3 root    admin     96 Jun 13  2019 BlockBlock Helper.app
-  	# ex. drwxr-xr-x@  3 marvin  admin     96 Jan 29  2019 LuLu.app
-  	products = ["BlockBlock Helper.app", "KnockKnock.app", "LuLu.app"].flat_map {|prod| "/Applications/#{prod}"}
+  	products = ["BlockBlock Helper.app", "KnockKnock.app", "LuLu.app"].map {|prod| ObjectiveSee.new prod}.filter_map {|product| product.installed? }
 
-  	# get a list of all installed products
-  	@installed = {
-  		:writable => [],
-  		:unwritable => []
-  	}
 
-  	# TODO get versions. They are installed in Product.App/Contents/Info.plist
-  	# CFBundleVersion is the key in the xml file
-
-  	products.each do |dir| 
-  		if is_dir? dir
-  			writable? dir ? @installed[:writable] << dir @installed[:unwirtable] << dir
-  		end
-  	end
 
   	# May also need to check if products are enabled 
   	# How do I send a signal to a product and simulate hitting the enable/disable button? 
@@ -55,21 +69,6 @@ class MetasploitModule < Msf::Post
   	# TODO use process monitor. Hit the disable button on LuLu find args, see if you can replicate in module
   	# Check if apps are executable so you can check if you can send disable switch
   	# Remove LuLu's peristence mechanism be it a login item, launch agent, launch daemon etc.
-  	%i[writable unwritable].each do |status|
-  		@installed[status].each do |dir|
-  			# TODO read Contents/Info.plist file and get version of each app
-  			#plist = dir + "Contents/Info.plist"
-  			#file = File.open plist
-  			#read = File.read file
-  			#doc = Nokogiri::XML::Document.parse read
-
-
-  			print_good "#{dir} is installed and is #{status}"
-  		end 
-  	end 
-
-
-  	@installed
   end
 
   def disable_LuLu
@@ -80,4 +79,5 @@ class MetasploitModule < Msf::Post
   	print_status("Enumerating Objective See security products.")
   	enumerate
   end
+
 end
