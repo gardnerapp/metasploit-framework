@@ -48,6 +48,13 @@ class MetasploitModule < Msf::Post
   		end
   	end
 
+  	# May also need to check if products are enabled 
+  	# How do I send a signal to a product and simulate hitting the enable/disable button? 
+  	# Is there a way to interact with the command line?
+
+  	# TODO use process monitor. Hit the disable button on LuLu find args, see if you can replicate in module
+  	# Check if apps are executable so you can check if you can send disable switch
+  	# Remove LuLu's peristence mechanism be it a login item, launch agent, launch daemon etc.
   	%i[writable unwritable].each do |status|
   		@installed[status].each do |dir|
   			# TODO read Contents/Info.plist file and get version of each app
