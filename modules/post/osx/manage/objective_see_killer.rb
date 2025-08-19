@@ -27,10 +27,15 @@ class MetasploitModule < Msf::Post
 
   # Holds information on an objective see product. i.e name, installation status user perms, group perms, owner, and location on filesystem.
   class ObjectiveSee
+
+    # Array of products present on system
+    @@present = []
+
     def initalize(name)
       @name = name
       @path = "/Applications/#{name}"
-      @installed = installed?
+      @installed = is_installed?
+      @@present << self if is_installed?
     end 
 
     # define accessor methods
@@ -40,20 +45,13 @@ class MetasploitModule < Msf::Post
     end 
    end 
 
-   def installed?
-    if is_dir? @path
-      @installed = true 
-      ObjectiveSee.product_list << self
-    else 
-       @installed = false
-     end 
-     @installed
+   def is_installed?
+    @installed = is_dir?(@path)
    end 
 
    class << self
-    def product_list
-      []
-    end 
+    def present
+      @@present
    end 
   end 
 
