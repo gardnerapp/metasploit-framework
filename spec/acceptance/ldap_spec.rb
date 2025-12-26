@@ -3,8 +3,6 @@ require 'acceptance_spec_helper'
 RSpec.describe 'LDAP modules' do
   include_context 'wait_for_expect'
 
-  RHOST_REGEX = /\d+\.\d+\.\d+\.\d+:\d+/
-
   tests = {
     ldap: {
       target: {
@@ -14,8 +12,8 @@ RSpec.describe 'LDAP modules' do
         datastore: {
           global: {},
           module: {
-            username: ENV.fetch('LDAP_USERNAME', "'DEV-AD\\Administrator'"),
-            password: ENV.fetch('LDAP_PASSWORD', 'admin123!'),
+            ldapusername: ENV.fetch('LDAP_LDAPUsername', "'DEV-AD\\Administrator'"),
+            ldappassword: ENV.fetch('LDAP_LDAPPassword', 'admin123!'),
             rhost: ENV.fetch('LDAP_RHOST', '127.0.0.1'),
             rport: ENV.fetch('LDAP_RPORT', '389'),
             ssl: ENV.fetch('LDAP_SSL', 'false')
@@ -53,22 +51,25 @@ RSpec.describe 'LDAP modules' do
             all: {
               required: [
                 /Discovered base DN/,
-                /Query returned 4 results/
+                /Query returned 5 results/
               ]
             }
           }
         },
         {
-          name: 'auxiliary/gather/ldap_hashdump',
+          name: 'auxiliary/gather/ldap_passwords',
           platforms: %i[linux osx windows],
           targets: [:session, :rhost],
           skipped: false,
           lines: {
             all: {
               required: [
-                /Searching base DN='DC=ldap,DC=example,DC=com'/,
-                /Storing LDAP data for base DN='DC=ldap,DC=example,DC=com' in loot/,
-                /266 entries, 0 creds found in 'DC=ldap,DC=example,DC=com'./
+                /Searching base DN: DC=ldap,DC=example,DC=com/,
+                /Checking if the target LDAP server is an Active Directory Domain Controller.../,
+                /The target LDAP server is not an Active Directory Domain Controller./,
+                /Credential found in ms-mcs-admpwd: Administrator:\[LAPSv1\]SuperSecretPassword!/,
+                /Credential found in mslaps-password: Administrator:\[LAPSv2\]SuperSecretPassword!/,
+                /Found [1-9]\d* entries and [1-9]\d* credentials in 'DC=ldap,DC=example,DC=com'./
               ]
             }
           }
@@ -84,19 +85,6 @@ RSpec.describe 'LDAP modules' do
               required: [
                 /Discovered base DN: DC=ldap,DC=example,DC=com/,
                 /The msDS-KeyCredentialLink field is empty./
-              ]
-            }
-          }
-        },
-        {
-          name: 'auxiliary/gather/ldap_esc_vulnerable_cert_finder',
-          platforms: %i[linux osx windows],
-          targets: [:session, :rhost],
-          skipped: false,
-          lines: {
-            all: {
-              required: [
-                /Successfully queried/
               ]
             }
           }
@@ -121,7 +109,7 @@ RSpec.describe 'LDAP modules' do
 
   allure_test_environment = AllureRspec.configuration.environment_properties
 
-  let_it_be(:current_platform) { Acceptance::Meterpreter.current_platform }
+  let_it_be(:current_platform) { Acceptance::Session.current_platform }
 
   # Driver instance, keeps track of all open processes/payloads/etc, so they can be closed cleanly
   let_it_be(:driver) do
@@ -187,7 +175,7 @@ RSpec.describe 'LDAP modules' do
         # Skip any ignored lines from the validation input
         validated_lines = test_result.lines.reject do |line|
           is_acceptable = known_failures.any? do |acceptable_failure|
-            is_matching_line = is_matching_line.value.is_a?(Regexp) ? line.match?(acceptable_failure.value) : line.include?(acceptable_failure.value)
+            is_matching_line = acceptable_failure.value.is_a?(Regexp) ? line.match?(acceptable_failure.value) : line.include?(acceptable_failure.value)
             is_matching_line &&
               acceptable_failure.if?(test_environment)
           end || line.match?(/Passed: \d+; Failed: \d+/)
@@ -196,7 +184,7 @@ RSpec.describe 'LDAP modules' do
         end
 
         validated_lines.each do |test_line|
-          test_line = Acceptance::Meterpreter.uncolorize(test_line)
+          test_line = Acceptance::Session.uncolorize(test_line)
           expect(test_line).to_not include('FAILED', '[-] FAILED', '[-] Exception', '[-] '), "Unexpected error: #{test_line}"
         end
 
@@ -286,12 +274,12 @@ RSpec.describe 'LDAP modules' do
   tests.each do |runtime_name, test_config|
     runtime_name = "#{runtime_name}#{ENV.fetch('RUNTIME_VERSION', '')}"
 
-    describe "#{Acceptance::Meterpreter.current_platform}/#{runtime_name}", focus: test_config[:focus] do
+    describe "#{Acceptance::Session.current_platform}/#{runtime_name}", focus: test_config[:focus] do
       test_config[:module_tests].each do |module_test|
         describe(
           module_test[:name],
           if:
-            Acceptance::Meterpreter.supported_platform?(module_test)
+            Acceptance::Session.supported_platform?(module_test)
         ) do
           let(:target) { Acceptance::Target.new(test_config[:target]) }
 
@@ -352,7 +340,7 @@ RSpec.describe 'LDAP modules' do
 
           context 'when targeting a session', if: module_test[:targets].include?(:session) do
             it(
-              "#{Acceptance::Meterpreter.current_platform}/#{runtime_name} session opens and passes the #{module_test[:name].inspect} tests"
+              "#{Acceptance::Session.current_platform}/#{runtime_name} session opens and passes the #{module_test[:name].inspect} tests"
             ) do
               with_test_harness(module_test) do |replication_commands|
                 # Ensure we have a valid session id; We intentionally omit this from a `before(:each)` to ensure the allure attachments are generated if the session dies
@@ -379,7 +367,7 @@ RSpec.describe 'LDAP modules' do
 
           context 'when targeting an rhost', if: module_test[:targets].include?(:rhost) do
             it(
-              "#{Acceptance::Meterpreter.current_platform}/#{runtime_name} rhost opens and passes the #{module_test[:name].inspect} tests"
+              "#{Acceptance::Session.current_platform}/#{runtime_name} rhost opens and passes the #{module_test[:name].inspect} tests"
             ) do
               with_test_harness(module_test) do |replication_commands|
                 use_module = "use #{module_test[:name]}"

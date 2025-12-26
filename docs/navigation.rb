@@ -445,6 +445,9 @@ NAVIGATION_CONFIG = [
           {
             path: 'How-to-use-the-Favorite-command.md'
           },
+          {
+            path: 'How-to-use-Metasploit-with-ngrok.md'
+          },
         ]
       },
     ]
@@ -593,6 +596,10 @@ NAVIGATION_CONFIG = [
                     title: 'RC4 Support'
                   },
                 ]
+              },
+              {
+                path: 'Post-Mixins.md',
+                title: 'PostMixins'
               },
               {
                 path: 'How-to-log-in-Metasploit.md',
@@ -852,6 +859,9 @@ NAVIGATION_CONFIG = [
           },
           {
             path: 'Loading-Test-Modules.md'
+          },
+          {
+            path: 'Payload-Testing.md'
           },
           {
             path: 'Measuring-Metasploit-Performance.md'

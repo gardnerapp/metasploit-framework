@@ -44,7 +44,7 @@ Gem::Specification.new do |spec|
   spec.test_files    = spec.files.grep(%r{^spec/})
   spec.require_paths = ["lib"]
 
-  spec.required_ruby_version = '>= 2.7'
+  spec.required_ruby_version = '>= 3.1'
 
   # Database support
   spec.add_runtime_dependency 'activerecord', *Metasploit::Framework::RailsVersionConstraint::RAILS_VERSION
@@ -69,14 +69,14 @@ Gem::Specification.new do |spec|
   # Metasploit::Credential database models
   spec.add_runtime_dependency 'metasploit-credential'
   # Database models shared between framework and Pro.
-  spec.add_runtime_dependency 'metasploit_data_models'
+  spec.add_runtime_dependency 'metasploit_data_models', '>= 6.0.7'
   # Things that would normally be part of the database model, but which
   # are needed when there's no database
   spec.add_runtime_dependency 'metasploit-model'
   # Needed for Meterpreter
-  spec.add_runtime_dependency 'metasploit-payloads', '2.0.166'
+  spec.add_runtime_dependency 'metasploit-payloads', '2.0.237'
   # Needed for the next-generation POSIX Meterpreter
-  spec.add_runtime_dependency 'metasploit_payloads-mettle', '1.0.31'
+  spec.add_runtime_dependency 'metasploit_payloads-mettle', '1.0.45'
   # Needed by msfgui and other rpc components
   # Locked until build env can handle newer version. See: https://github.com/msgpack/msgpack-ruby/issues/334
   spec.add_runtime_dependency 'msgpack', '~> 1.6.0'
@@ -100,16 +100,19 @@ Gem::Specification.new do |spec|
   spec.add_runtime_dependency 'recog'
   # required for bitlocker fvek extraction
   spec.add_runtime_dependency 'openssl-ccm'
-  # Needed for documentation generation - locked unitl Ruby 2.6 support is dropped
-  spec.add_runtime_dependency 'octokit', '~> 4.0'
+  spec.add_runtime_dependency 'octokit'
   spec.add_runtime_dependency 'redcarpet'
   # Needed for Microsoft patch finding tool (msu_finder)
   spec.add_runtime_dependency 'patch_finder'
   # Required for Metasploit Web Services
   spec.add_runtime_dependency 'puma'
   spec.add_runtime_dependency 'ruby-mysql'
-  spec.add_runtime_dependency 'thin'
-  spec.add_runtime_dependency 'sinatra'
+  # webserver - pinned due to: https://github.com/github/secure_headers/issues/514
+  spec.add_runtime_dependency 'thin', '~> 1.x'
+  # rack pinned due to authlogic warnings when setting cookie keys with a / char present: https://github.com/binarylogic/authlogic/issues/779
+  spec.add_runtime_dependency 'rack', '~> 2.2'
+  # 4.x needs tested and verified for JSON RPC service
+  spec.add_runtime_dependency 'sinatra', '~> 3.2'
   spec.add_runtime_dependency 'warden'
   spec.add_runtime_dependency 'swagger-blocks'
   # Required for JSON-RPC client
@@ -128,8 +131,8 @@ Gem::Specification.new do |spec|
   spec.add_runtime_dependency 'http-cookie'
   # Needed for some modules (polkit_auth_bypass.rb)
   spec.add_runtime_dependency 'unix-crypt'
-  # Needed for Kerberos structure parsing
-  spec.add_runtime_dependency 'rasn1'
+  # Needed for Kerberos structure parsing; Pinned to ensure a security review is performed on updates
+  spec.add_runtime_dependency 'rasn1', '0.14.0'
 
   #
   # File Parsing Libraries
@@ -148,12 +151,16 @@ Gem::Specification.new do |spec|
   spec.add_runtime_dependency 'net-ssh'
   spec.add_runtime_dependency 'ed25519' # Adds ed25519 keys for net-ssh
   spec.add_runtime_dependency 'bcrypt_pbkdf'
-  spec.add_runtime_dependency 'ruby_smb', '~> 3.3.3'
+  spec.add_runtime_dependency 'ruby_smb', '~> 3.3.15'
   spec.add_runtime_dependency 'net-imap' # Used in Postgres auth for its SASL stringprep implementation
+  spec.add_runtime_dependency 'date', '3.4.1' # Temporarily pinned until 3.5 can be tested
   spec.add_runtime_dependency 'net-ldap'
   spec.add_runtime_dependency 'net-smtp'
   spec.add_runtime_dependency 'net-sftp'
+  spec.add_runtime_dependency 'rest-client'
   spec.add_runtime_dependency 'winrm'
+  # Pinned to avoid WinRM warnings: https://github.com/WinRb/WinRM/issues/355 - if bumping verify windows/winrm/winrm_script_exec works against metasploitable with vagrant/vagrant creds
+  spec.add_runtime_dependency 'rexml', '3.4.1'
   spec.add_runtime_dependency 'ffi', '< 1.17.0'
 
   #
@@ -219,7 +226,7 @@ Gem::Specification.new do |spec|
   # SSH server library with ed25519
   spec.add_runtime_dependency 'hrr_rb_ssh-ed25519'
   # Needed for irb internal command
-  spec.add_runtime_dependency 'irb', '~> 1.7.4'
+  spec.add_runtime_dependency 'irb'
 
   # AWS enumeration modules
   spec.add_runtime_dependency 'aws-sdk-s3'
@@ -234,7 +241,7 @@ Gem::Specification.new do |spec|
   spec.add_runtime_dependency 'faye-websocket'
   spec.add_runtime_dependency 'eventmachine'
 
-  spec.add_runtime_dependency 'faraday', '2.7.11'
+  spec.add_runtime_dependency 'faraday'
   spec.add_runtime_dependency 'faraday-retry'
 
   # Required for windows terminal colors as of Ruby 3.0
@@ -251,15 +258,33 @@ Gem::Specification.new do |spec|
   # Needed for multiline REPL support for interactive SQL sessions
   spec.add_runtime_dependency 'reline'
 
+  # Needed to parse sections of ELF files in order to retrieve symbols
+  spec.add_runtime_dependency 'elftools'
+
+  # Needed for generic in-memory cachine
+  spec.add_runtime_dependency 'lru_redux'
+
+  # Pinned on 3.1.1 as it is the version supported by our Ruby 3.3.8 dependency to avoid this issue https://github.com/rubygems/rubygems/issues/7657#issuecomment-2521083323
+  # When Ruby ships with `gem --version` 3.6.0 or higher by default this can be removed
+  spec.add_runtime_dependency 'stringio', '3.1.1'
+
+  # Needed for caching validation
+  spec.add_runtime_dependency 'parallel'
+
   # Standard libraries: https://www.ruby-lang.org/en/news/2023/12/25/ruby-3-3-0-released/
   %w[
     abbrev
     base64
+    benchmark
     bigdecimal
     csv
     drb
+    fiddle
     getoptlong
     mutex_m
+    ostruct
+    rinda
+    syslog
   ].each do |library|
     spec.add_runtime_dependency library
   end

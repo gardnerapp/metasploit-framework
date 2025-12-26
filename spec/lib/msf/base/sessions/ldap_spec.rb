@@ -4,7 +4,7 @@ require 'spec_helper'
 
 RSpec.describe Msf::Sessions::LDAP do
   let(:client) { instance_double(Rex::Proto::LDAP::Client) }
-  let(:opts) { { client: client } }
+  let(:opts) { { client: client, keepalive_seconds: 600 } }
   let(:console_class) { Rex::Post::LDAP::Ui::Console }
   let(:user_input) { instance_double(Rex::Ui::Text::Input::Readline) }
   let(:user_output) { instance_double(Rex::Ui::Text::Output::Stdio) }
@@ -23,6 +23,7 @@ RSpec.describe Msf::Sessions::LDAP do
     allow(client).to receive(:peerinfo).and_return(peer_info)
     allow(client).to receive(:peerhost).and_return(address)
     allow(client).to receive(:peerport).and_return(port)
+    allow(client).to receive(:ldapwhoami).and_return("u:WORKGROUP\\Administrator")
   end
 
   it_behaves_like 'client session'

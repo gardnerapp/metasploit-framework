@@ -38,6 +38,7 @@ module Auxiliary::AuthBrute
       OptBool.new('REMOVE_USERPASS_FILE', [ true, "Automatically delete the USERPASS_FILE on module completion", false]),
       OptBool.new('PASSWORD_SPRAY', [true, "Reverse the credential pairing order. For each password, attempt every possible user.", false]),
       OptInt.new('TRANSITION_DELAY', [false, "Amount of time (in minutes) to delay before transitioning to the next user in the array (or password when PASSWORD_SPRAY=true)", 0]),
+      OptString.new('SSLKeyLogFile', [ false, 'The SSL key log file', ENV['SSLKeyLogFile']]),
       OptInt.new('MaxGuessesPerService', [ false, "Maximum number of credentials to try per service instance. If set to zero or a non-number, this option will not be used.", 0]), # Tracked in @@guesses_per_service
       OptInt.new('MaxMinutesPerService', [ false, "Maximum time in minutes to bruteforce the service instance. If set to zero or a non-number, this option will not be used.", 0]), # Tracked in @@brute_start_time
       OptInt.new('MaxGuessesPerUser', [ false, %q{
@@ -58,6 +59,7 @@ module Auxiliary::AuthBrute
   # @return [Metasploit::Framework::CredentialCollection] the built CredentialCollection
   def build_credential_collection(opts)
     cred_collection = Metasploit::Framework::CredentialCollection.new({
+      anonymous_login: datastore['ANONYMOUS_LOGIN'],
       blank_passwords: datastore['BLANK_PASSWORDS'],
       pass_file: datastore['PASS_FILE'],
       user_file: datastore['USER_FILE'],
@@ -605,7 +607,7 @@ module Auxiliary::AuthBrute
       rescue
         return []
       end
-      upfile_contents.split(/\n/).each do |line|
+      upfile_contents.split("\n").each do |line|
         user,pass = line.split(/\s+/,2).map { |x| x.strip }
         creds << [user.to_s, pass.to_s]
       end
@@ -727,7 +729,7 @@ module Auxiliary::AuthBrute
     else
       complete_message = ''
       unless ip.blank? && port.blank?
-        complete_message << "#{ip}:#{port}"
+        complete_message << Rex::Socket.to_authority(ip, port).ljust(21)
       else
         complete_message << proto || 'Bruteforce'
       end

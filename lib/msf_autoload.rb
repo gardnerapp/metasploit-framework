@@ -75,7 +75,7 @@ class MsfAutoload
       "#{__dir__}/msf/core/rpc/v10",
       "#{__dir__}/msf/core/payload/osx/x64",
       "#{__dir__}/msf/core/payload/windows/x64",
-      "#{__dir__}/msf/core/payload/linux/x64",
+      # "#{__dir__}/msf/core/payload/linux/x64",
       "#{__dir__}/msf/core/web_services/servlet",
       "#{__dir__}/msf/base",
       "#{__dir__}/rex/parser/fs"
@@ -124,6 +124,7 @@ class MsfAutoload
       'macho' => 'MachO',
       'nodejs' => 'NodeJS',
       'jsobfu' => 'JSObfu',
+      'vbsobfuscate' => 'VBSObfuscate',
       'osx' => 'OSX',
       'webrtc' => 'WebRTC',
       'json' => 'JSON',
@@ -297,7 +298,14 @@ class MsfAutoload
       'appapi' => 'AppApi',
       'uds_errors' => 'UDSErrors',
       'smb_hash_capture' => 'SMBHashCapture',
-      'rex_ntlm' => 'RexNTLM'
+      'rex_ntlm' => 'RexNTLM',
+      'teamcity' => 'TeamCity',
+      'nist_sp_800_38f' => 'NIST_SP_800_38f',
+      'nist_sp_800_108' => 'NIST_SP_800_108',
+      'sccm' => 'SCCM',
+      'pfsense' => 'PfSense',
+      'opnsense' => 'OPNSense',
+      'pgadmin' => 'PgAdmin',
     }
   end
 
@@ -340,6 +348,7 @@ autoload :BinData, 'bindata'
 autoload :RubySMB, 'ruby_smb'
 autoload :MetasploitPayloads, 'metasploit-payloads'
 autoload :PacketFu, 'packetfu'
+autoload :DidYouMean, 'did_you_mean'
 
 require 'rexml/document'
 # Load IO#expect moneypatch
