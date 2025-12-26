@@ -1,4 +1,4 @@
-name: Acceptance
+name: Postgres Acceptance
 
 # Optional, enabling concurrency limits: https://docs.github.com/en/actions/using-jobs/using-concurrency
 #concurrency:
@@ -33,6 +33,8 @@ on:
       - 'metsploit-framework.gemspec'
       - 'Gemfile.lock'
       - '**/**postgres**'
+      - 'lib/metasploit/framework/tcp/**'
+      - 'lib/metasploit/framework/login_scanner/**'
       - 'spec/acceptance/**'
       - 'spec/support/acceptance/**'
       - 'spec/acceptance_spec_helper.rb'
@@ -44,7 +46,7 @@ on:
 jobs:
   postgres:
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 40
+    timeout-minutes: 60
 
     services:
       postgres:
@@ -54,7 +56,7 @@ jobs:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: password
         options: >-
-          --health-cmd pg_isready
+          --health-cmd "pg_isready --username postgres"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
@@ -81,6 +83,11 @@ jobs:
 
       - name: Checkout code
         uses: actions/checkout@v4
+
+      # https://github.com/orgs/community/discussions/26952
+      - name: Support longpaths
+        if: runner.os == 'Windows'
+        run: git config --system core.longpaths true
 
       - name: Setup Ruby
         env:
@@ -139,6 +146,11 @@ jobs:
         if: always()
         run: sudo apt-get -y --no-install-recommends install libpcap-dev graphviz
 
+      # https://github.com/orgs/community/discussions/26952
+      - name: Support longpaths
+        if: runner.os == 'Windows'
+        run: git config --system core.longpaths true
+
       - name: Setup Ruby
         if: always()
         env:
@@ -148,9 +160,6 @@ jobs:
           ruby-version: '${{ matrix.ruby }}'
           bundler-cache: true
           cache-version: 4
-          # Github actions with Ruby requires Bundler 2.2.18+
-          # https://github.com/ruby/setup-ruby/tree/d2b39ad0b52eca07d23f3aa14fdf2a3fcc1f411c#windows
-          bundler: 2.2.33
 
       - uses: actions/download-artifact@v4
         id: download

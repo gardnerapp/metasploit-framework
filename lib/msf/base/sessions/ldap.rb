@@ -14,23 +14,45 @@ class Msf::Sessions::LDAP
   # @return [Rex::Proto::LDAP::Client] The LDAP client
   attr_accessor :client
 
+  attr_accessor :keep_alive_thread
+  
+  # @return [Integer] Seconds between keepalive requests
+  attr_accessor :keepalive_seconds
+
   attr_accessor :platform, :arch
   attr_reader :framework
 
   # @param[Rex::IO::Stream] rstream
   # @param [Hash] opts
   # @option opts [Rex::Proto::LDAP::Client] :client
+  # @option opts [Integer] :keepalive
   def initialize(rstream, opts = {})
     @client = opts.fetch(:client)
+    @keepalive_seconds = opts.fetch(:keepalive_seconds)
     self.console = Rex::Post::LDAP::Ui::Console.new(self)
     super(rstream, opts)
+  end
+
+  def cleanup
+    stop_keep_alive_loop
+    super
   end
 
   def bootstrap(datastore = {}, handler = nil)
     session = self
     session.init_ui(user_input, user_output)
 
-    @info = "LDAP #{datastore['USERNAME']} @ #{@peer_info}"
+    username = datastore['USERNAME']
+    if username.blank?
+      begin
+        whoami = client.ldapwhoami
+      rescue Net::LDAP::Error => e
+        ilog('ldap session opened with no username and the target does not support the LDAP whoami extension')
+      else
+        username = whoami.delete_prefix('u:').split('\\').last
+      end
+    end
+    @info = "LDAP #{username} @ #{@peer_info}"
   end
 
   def execute_file(full_path, args)
@@ -139,4 +161,31 @@ class Msf::Sessions::LDAP
     raise EOFError if (console.stopped? == true)
   end
 
+  def on_registered
+    start_keep_alive_loop
+  end
+
+  # Start a background thread for regularly sending a no-op command to keep the connection alive
+  def start_keep_alive_loop
+    self.keep_alive_thread = framework.threads.spawn("LDAP-shell-keepalive-#{sid}", false) do
+      loop do
+        if client.last_interaction.nil?
+          remaining_sleep = @keepalive_seconds
+        else
+          remaining_sleep = @keepalive_seconds - (Process.clock_gettime(Process::CLOCK_MONOTONIC) - client.last_interaction)
+        end
+        sleep(remaining_sleep)
+        if (Process.clock_gettime(Process::CLOCK_MONOTONIC) - client.last_interaction) > @keepalive_seconds
+          client.search_root_dse
+        end
+        # This should have moved last_interaction forwards
+        fail if (Process.clock_gettime(Process::CLOCK_MONOTONIC) - client.last_interaction) > @keepalive_seconds
+      end
+    end
+  end
+
+  # Stop the background thread
+  def stop_keep_alive_loop
+    keep_alive_thread.kill
+  end
 end

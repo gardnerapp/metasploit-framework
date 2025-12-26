@@ -39,6 +39,31 @@ module Msf
         result
       end
 
+      # Take credentials hash and check data for username and password and then returns a hash for those values
+      #
+      # @param [Hash] credential_data
+      # @return [Hash]
+      def login_credentials(credential_data)
+        # If the database is active and core is populated then grab the creds from there, otherwise
+        # fallback and check in credentials data's top layer
+        if framework.db&.active && credential_data[:core]
+          {
+            public: credential_data[:core].public,
+            private_data: credential_data[:core].private
+          }
+        elsif credential_data[:username] && credential_data[:private_data]
+          {
+            public: credential_data[:username],
+            private_data: credential_data[:private_data]
+          }
+        else
+          {
+            public: 'credentials could not be reported',
+            private_data: 'credentials could not be reported'
+          }
+        end
+      end
+
       # Creates a credential and adds to to the DB if one is present
       #
       # @param [Hash] credential_data
@@ -46,13 +71,23 @@ module Msf
       def create_credential_login(credential_data)
         return super unless framework.features.enabled?(Msf::FeatureManager::SHOW_SUCCESSFUL_LOGINS) && datastore['ShowSuccessfulLogins'] && @report
 
-        credential = {
-          public: credential_data[:username],
-          private_data: credential_data[:private_data]
-        }
-        @report[rhost] = { successful_logins: [] }
-        @report[rhost][:successful_logins] << credential
+        @report[rhost] ||= {}
+        @report[rhost][:successful_logins] ||= []
+        @report[rhost][:successful_logins] << login_credentials(credential_data)
         super
+      end
+
+      def report_successful_login(public:, private:)
+        return unless framework.features.enabled?(Msf::FeatureManager::SHOW_SUCCESSFUL_LOGINS) && datastore['ShowSuccessfulLogins'] && @report
+
+        @report[rhost] ||= {}
+        @report[rhost][:successful_logins] ||= []
+        @report[rhost][:successful_logins] << {
+          public: public,
+          private_data: private
+        }
+
+        nil
       end
 
       # Creates a credential and adds to to the DB if one is present, then calls create_credential_login to
@@ -69,12 +104,9 @@ module Msf
       def create_credential_and_login(credential_data)
         return super unless framework.features.enabled?(Msf::FeatureManager::SHOW_SUCCESSFUL_LOGINS) && datastore['ShowSuccessfulLogins'] && @report
 
-        credential = {
-          public: credential_data[:username],
-          private_data: credential_data[:private_data]
-        }
-        @report[rhost] = { successful_logins: [] }
-        @report[rhost][:successful_logins] << credential
+        @report[rhost] ||= {}
+        @report[rhost][:successful_logins] ||= []
+        @report[rhost][:successful_logins] << login_credentials(credential_data)
         super
       end
 
@@ -88,16 +120,11 @@ module Msf
       # @param [Msf::Sessions::<SESSION_CLASS>] sess
       # @return [Msf::Sessions::<SESSION_CLASS>]
       def start_session(obj, info, ds_merge, crlf = false, sock = nil, sess = nil)
-        return super unless framework.features.enabled?(Msf::FeatureManager::SHOW_SUCCESSFUL_LOGINS) && datastore['ShowSuccessfulLogins']
-
-        unless @report && @report[rhost]
-          elog("No RHOST found in report, skipping reporting for #{rhost}")
-          print_brute level: :error, ip: rhost, msg: "No RHOST found in report, skipping reporting for #{rhost}"
-          return super
-        end
+        return super unless framework.features.enabled?(Msf::FeatureManager::SHOW_SUCCESSFUL_LOGINS) && datastore['ShowSuccessfulLogins'] && @report
 
         result = super
-        @report[rhost].merge!({ successful_sessions: [] })
+        @report[rhost] ||= {}
+        @report[rhost][:successful_sessions] ||= []
         @report[rhost][:successful_sessions] << result
         result
       end
@@ -110,6 +137,7 @@ module Msf
       #
       # @return [Hash] Rhost keys mapped to successful logins and sessions for each host
       def print_report_summary
+        return unless @report
         report = @report
 
         logins = report.flat_map { |_k, v| v[:successful_logins] }.compact
